@@ -9,6 +9,7 @@ I use it in my project [PebbleTransilien](https://github.com/CocoaBob/PebbleTran
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/CocoaBob/PebbleActionList/master/demo.gif" width="144" height="168"/>
+<img src="https://raw.githubusercontent.com/CocoaBob/PebbleActionList/master/demo_aplit.png" width="144" height="168"/>
 </p>
 
 ## The MIT License (MIT)

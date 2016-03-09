@@ -10,7 +10,11 @@
 
 #include "action_list.h"
 
+#ifdef PBL_ROUND
+#define ACTION_LIST_BAR_WIDTH 12
+#else
 #define ACTION_LIST_BAR_WIDTH 14
+#endif
 #define ACTION_LIST_BAR_POINT_X 7
 #define ACTION_LIST_BAR_POINT_Y 10
 #define ACTION_LIST_ROW_HEIGHT_MIN 22
@@ -35,18 +39,18 @@ static void action_list_bar_layer_proc(Layer *layer, GContext *ctx) {
     
 #ifdef PBL_COLOR
     ActionList *user_info = *((ActionList**)layer_get_data(layer));
-    graphics_context_set_fill_color(ctx, user_info->config->colors.background);
-#else
-    graphics_context_set_fill_color(ctx, GColorWhite);
 #endif
+    
+    graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(user_info->config->colors.background, GColorWhite));
+    
+#ifdef PBL_ROUND
+    graphics_fill_radial(ctx, bounds, GOvalScaleModeFillCircle, ACTION_LIST_BAR_WIDTH, DEG_TO_TRIGANGLE(0), DEG_TO_TRIGANGLE(360));
+#else
     graphics_fill_rect(ctx, bounds, 0, GCornerNone);
     
-#ifdef PBL_COLOR
-    graphics_context_set_fill_color(ctx, user_info->config->colors.foreground);
-#else
-    graphics_context_set_fill_color(ctx, GColorBlack);
-#endif
+    graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(user_info->config->colors.foreground, GColorBlack));
     graphics_fill_circle(ctx, GPoint(ACTION_LIST_BAR_POINT_X, ACTION_LIST_BAR_POINT_Y), 2);
+#endif
 }
 
 // MARK: Menu layer callbacks
@@ -56,33 +60,46 @@ static uint16_t get_num_rows_callback(MenuLayer *menu_layer, uint16_t section_in
 }
 
 static int16_t get_cell_height_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, ActionList *user_info) {
+#ifdef PBL_ROUND
+    return menu_layer_is_index_selected(menu_layer, cell_index) ? MENU_CELL_ROUND_FOCUSED_SHORT_CELL_HEIGHT : MENU_CELL_ROUND_UNFOCUSED_SHORT_CELL_HEIGHT;
+#else
     return user_info->row_height;
+#endif
 }
 
 static void draw_row_callback(GContext *ctx, Layer *cell_layer, MenuIndex *cell_index, ActionList *user_info) {
-    bool is_selected = (menu_layer_get_selected_index(user_info->menu_layer).row == cell_index->row);
+    bool is_selected = menu_layer_is_index_selected(user_info->menu_layer, cell_index);
     bool is_enabled = true;
     if (user_info->config->callbacks.is_enabled && !user_info->config->callbacks.is_enabled(cell_index->row, user_info->config->context)) {
         is_enabled = false;
     }
     GRect bounds = layer_get_bounds(cell_layer);
     
-#ifdef PBL_BW
-    // Selected item's background for BW
-    if (is_selected) {
-        graphics_context_set_fill_color(ctx, GColorWhite);
-        graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-        
-        graphics_context_set_fill_color(ctx, GColorBlack);
-        graphics_fill_rect(ctx, grect_crop(bounds, ACTION_LIST_SELECTION_MARGIN), 4, GCornersAll);
-    }
-#endif
-    
 #ifdef PBL_COLOR
     graphics_context_set_text_color(ctx, is_selected?user_info->config->colors.text_selected:(is_enabled?user_info->config->colors.text:user_info->config->colors.text_disabled));
+#else
+    // Selected item's background for BW
+    if (is_selected) {
+        graphics_context_set_fill_color(ctx, GColorBlack);
+        graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+        
+        graphics_context_set_fill_color(ctx, GColorWhite);
+        graphics_fill_rect(ctx, grect_crop(bounds, ACTION_LIST_SELECTION_MARGIN), 4, GCornersAll);
+    }
+    graphics_context_set_text_color(ctx, is_selected?GColorBlack:GColorWhite);
 #endif
     
+#ifdef PBL_ROUND
+    GFont font;
+    if (is_selected) {
+        font = fonts_get_system_font(is_enabled?FONT_KEY_GOTHIC_24_BOLD:FONT_KEY_GOTHIC_24);
+    } else {
+        font = fonts_get_system_font(is_enabled?FONT_KEY_GOTHIC_18_BOLD:FONT_KEY_GOTHIC_18);
+    }
+#else
     GFont font = fonts_get_system_font(is_enabled?FONT_KEY_GOTHIC_18_BOLD:FONT_KEY_GOTHIC_18);
+#endif
+    
     char *text = user_info->config->callbacks.get_title(cell_index->row, user_info->config->context);
     GRect text_frame = grect_crop(bounds,
 #ifdef PBL_BW
@@ -95,12 +112,18 @@ static void draw_row_callback(GContext *ctx, Layer *cell_layer, MenuIndex *cell_
     
     text_frame.origin.y += ACTION_LIST_TEXT_Y_OFFSET;
     
+#ifdef PBL_ROUND
+    graphics_draw_text(ctx, text, font, text_frame, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+#else
     graphics_draw_text(ctx, text, font, text_frame, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+#endif
 }
 
 static void select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, ActionList *user_info) {
     if (!user_info->config->callbacks.is_enabled || user_info->config->callbacks.is_enabled(cell_index->row, user_info->config->context)) {
         user_info->config->callbacks.select_click(user_info->window, cell_index->row, user_info->config->context);
+        // Must remove the window after using it's user_info, otherwise user_info will be released too early.
+        window_stack_remove(user_info->window, true);
     }
 }
 
@@ -119,15 +142,13 @@ static void window_load(Window *window) {
     
     // Add menu layer
     user_info->menu_layer = menu_layer_create(GRect(bounds.origin.x  + ACTION_LIST_BAR_WIDTH,
-                                                      bounds.origin.y,
-                                                      bounds.size.w - ACTION_LIST_BAR_WIDTH,
-                                                      bounds.size.h));
+                                                    bounds.origin.y,
+                                                    bounds.size.w - PBL_IF_ROUND_ELSE(ACTION_LIST_BAR_WIDTH+ACTION_LIST_BAR_WIDTH, ACTION_LIST_BAR_WIDTH),
+                                                    bounds.size.h));
     layer_add_child(window_layer, menu_layer_get_layer(user_info->menu_layer));
     
     // Setup menu layer
-#if !defined(PBL_PLATFORM_APLITE)
     menu_layer_pad_bottom_enable(user_info->menu_layer, false);
-#endif
     
     menu_layer_set_callbacks(user_info->menu_layer, user_info, (MenuLayerCallbacks) {
         .get_num_rows = (MenuLayerGetNumberOfRowsInSectionsCallback)get_num_rows_callback,
@@ -137,12 +158,8 @@ static void window_load(Window *window) {
         .get_separator_height = (MenuLayerGetSeparatorHeightCallback)get_separator_height_callback
     });
     
-#ifdef PBL_COLOR
-    menu_layer_set_normal_colors(user_info->menu_layer, GColorBlack, user_info->config->colors.text);
-    menu_layer_set_highlight_colors(user_info->menu_layer, GColorBlack, user_info->config->colors.text_selected);
-#else
-    window_set_background_color(window, GColorBlack);
-#endif
+    menu_layer_set_normal_colors(user_info->menu_layer, GColorBlack, PBL_IF_COLOR_ELSE(user_info->config->colors.text, GColorWhite));
+    menu_layer_set_highlight_colors(user_info->menu_layer, GColorBlack, PBL_IF_COLOR_ELSE(user_info->config->colors.text_selected, GColorWhite));
     
     // Setup Click Config Providers
     menu_layer_set_click_config_onto_window(user_info->menu_layer, window);
@@ -150,7 +167,11 @@ static void window_load(Window *window) {
     // Add bar layer
     GRect bar_layer_frame = GRect(bounds.origin.x,
                                   bounds.origin.y,
+#ifdef PBL_ROUND
+                                  bounds.size.w,
+#else
                                   ACTION_LIST_BAR_WIDTH,
+#endif
                                   bounds.size.h);
     user_info->bar_layer = layer_create_with_data(bar_layer_frame, sizeof(ActionList **));
     *((ActionList **)layer_get_data(user_info->bar_layer)) = user_info;
@@ -181,7 +202,6 @@ static void window_appear(Window *window) {
     ActionList *user_info = window_get_user_data(window);
     
     menu_layer_set_selected_index(user_info->menu_layer, MenuIndex(0, user_info->config->default_selection), MenuRowAlignNone, false);
-//    printf("Heap Total <%4dB> Used <%4dB> Free <%4dB>",heap_bytes_used()+heap_bytes_free(),heap_bytes_used(),heap_bytes_free());
 }
 
 // MARK: Entry point
@@ -203,11 +223,6 @@ void action_list_open(ActionListConfig *config) {
             .appear = window_appear,
             .unload = window_unload
         });
-        
-#ifdef PBL_SDK_2
-        // Fullscreen
-        window_set_fullscreen(user_info->window, true);
-#endif
         
         window_stack_push(user_info->window, true);
     }

@@ -1,15 +1,14 @@
 # PebbleActionList
-Since Pebble OS 3.0, we could find a better solution to replace ActionBarLayer to give users a more flexible actions list, which is called [ActionMenu](http://developer.getpebble.com/docs/c/User_Interface/Window/ActionMenu/#ActionMenu) and is used in some of the built-in system apps. But before Pebble SDK 3.3, this feature wasn't included in the SDK, and since SDK 3.3, this feature is still not available for Aplite platform.
+Since Pebble OS 3.0, we could find a better solution to replace ActionBarLayer to give users a more flexible actions list, which is called [ActionMenu](http://developer.getpebble.com/docs/c/User_Interface/Window/ActionMenu/#ActionMenu) and it has been used in some of the built-in system apps. But before Pebble SDK 3.3, this feature wasn't included in the SDK, and since SDK 3.3, this feature is still not available for Aplite with SDK 2.x.
 
-I've created this project to realize a simplified single level actions list for both Aplite/Basalt platforms before Pebble SDK 3.3 was published, and it works fine for most of my needs.
+I've created this project to implement a simplified single level actions list for all Aplite/Basalt/Chalk platforms, and with more flexible features like preselected items and disabled items.
 
-There's a known issue that sometimes when we show the actions list for the 1st time, its MenuLayer's scroll position is incorrect...
-
-I use it in my project [PebbleTransilien](https://github.com/CocoaBob/PebbleTransilien), where you can find some demo codes, and here's a screenshot to demonstrate.
+I use it in my project [PebbleTransilien](https://github.com/CocoaBob/PebbleTransilien), where you can find some demo codes, and here are some screenshots to demonstrate.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/CocoaBob/PebbleActionList/master/demo.gif" width="144" height="168"/>
-<img src="https://raw.githubusercontent.com/CocoaBob/PebbleActionList/master/demo_aplit.png" width="144" height="168"/>
+<br>
+<img src="https://raw.githubusercontent.com/CocoaBob/PebbleActionList/master/demo.png" width="890" height="300"/>
 </p>
 
 ## The MIT License (MIT)
